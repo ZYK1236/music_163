@@ -1,10 +1,19 @@
 <template>
   <div class="audioBar-wrap">
+    <a-slider
+      style="position: absolute; width: 95%; bottom: 52px"
+      v-model="sliderValue"
+      @afterChange="onSliderChange"
+      max="1000"
+    ></a-slider>
     <div class="song-basic-information">
-      <div class="profile"></div>
+      <div class="profile">
+        <el-image style="height: 100%; width: 100%" :src="picUrl" fit="fill">
+        </el-image>
+      </div>
       <div class="message">
-        <div class="title-and-singer">沦陷 (抖音女声版)-黄雯雯</div>
-        <div class="progress">00:00 / 03:30</div>
+        <div class="title-and-singer">{{ title }} - {{ singer }}</div>
+        <div class="progress">{{ currentTime }} / {{ endTime }}</div>
       </div>
     </div>
     <div class="song-control">
@@ -19,6 +28,15 @@
         type="play-circle"
         style="color: #1890ff; font-size: 40px"
         theme="filled"
+        v-show="!play"
+        @click="playSong"
+      />
+      <a-icon
+        type="pause"
+        class="icon-trigger"
+        style="color: #1890ff; font-size: 40px"
+        v-show="play"
+        @click="pauseSong"
       />
       <a-icon
         class="icon-trigger"
@@ -31,6 +49,7 @@
       <a-icon type="sound" theme="filled" style="font-size: 20px" />
       <a-slider
         :default-value="30"
+        @change="onVolumeChange"
         style="width: 100px; margin: 0px 0px 1px 15px"
       />
       <a href="https://github.com/ZYK1236/music_163">
@@ -41,16 +60,106 @@
         />
       </a>
     </div>
-    <audio></audio>
+
+    <audio
+      :src="src"
+      autoplay
+      @canplay="getDuration"
+      @timeupdate="updateTime"
+      ref="audio"
+      @ended="ended"
+    ></audio>
   </div>
 </template>
 
 <script>
-export default {};
+import store from "../store/index.js";
+import audioplayerApi from "../api/audioplayer.js";
+
+export default {
+  data() {
+    return {
+      src: "",
+      title: "当前没有歌曲",
+      singer: "",
+      picUrl: "",
+      play: false,
+      duration: 0,
+      endTime: "",
+      currentTime: "",
+      sliderValue: 0,
+    };
+  },
+
+  computed: {
+    getid() {
+      return store.state.id;
+    },
+  },
+
+  watch: {
+    getid: {
+      async handler(newId) {
+        let { success } = (await audioplayerApi.checkSongUrl(newId)) || false;
+        if (success) {
+          let { data } = await audioplayerApi.getSongUrl(newId);
+          this.src = data[0].url;
+        }
+
+        let { code, songs } = await audioplayerApi.getSongDetail(newId);
+        if (code === 200) {
+          this.play = true;
+          this.title = songs[0].al.name;
+          this.picUrl = songs[0].al.picUrl;
+          this.singer = songs[0].ar[0].name;
+        }
+      },
+    },
+  },
+
+  methods: {
+    playSong() {
+      this.play = true;
+      this.$refs.audio.play();
+    },
+    pauseSong() {
+      this.play = false;
+      this.$refs.audio.pause();
+    },
+    onVolumeChange(value) {
+      this.$refs.audio.volume = value / 100;
+    },
+    onSliderChange(value) {
+      this.$refs.audio.currentTime = (value / 1000) * this.duration;
+    },
+    getDuration() {
+      this.duration = this.$refs.audio.duration;
+      this.endTime = this.handleToStandradTime(this.$refs.audio.duration);
+    },
+    updateTime(e) {
+      this.currentTime = this.handleToStandradTime(e.target.currentTime); //获取audio当前播放时间
+      this.sliderValue = (e.target.currentTime * 1000) / this.duration;
+    },
+    handleToStandradTime(time) {
+      let minute = Math.floor(time / 60);
+      let second = (time / 60 - minute) * 60;
+      if (second < 10) {
+        second = "0" + second;
+      } else {
+        second = "" + second;
+      }
+      second = second.slice(0, 2);
+      return `${minute} : ${second}`;
+    },
+    ended() {
+      this.play = false;
+    },
+  },
+};
 </script>
 
 <style lang="less" scoped>
-@borderStyle: 1px solid black;
+@borderStyle: 1px solid #fff;
 .icon-trigger:hover {
   cursor: pointer;
 }
@@ -62,7 +171,7 @@ export default {};
   justify-content: space-between;
   width: 100%;
   height: 70px;
-  padding: 10px 40px;
+  padding: 10px 20px;
   background-color: #fff;
 
   .song-basic-information {

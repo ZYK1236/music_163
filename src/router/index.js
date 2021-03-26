@@ -1,6 +1,5 @@
 import Vue from "vue";
 import VueRouter from "vue-router";
-import Home from "../views/Home.vue";
 
 Vue.use(VueRouter);
 
@@ -12,14 +11,18 @@ const routes = [
   {
     path: "/home",
     name: "Home",
-    component: Home,
+    redirect: "/home/discovery",
+    component: () => import("@/views/home"),
     children: [
       {
-        // 当 /user/:id/profile 匹配成功，
-        // UserProfile 会被渲染在 User 的 <router-view> 中
-        path: "profile",
-        component: () =>
-          import(/* webpackChunkName: "about" */ "../views/About.vue"),
+        name: "Search",
+        path: "search",
+        component: () => import("@/views/searchList"),
+      },
+      {
+        name: 'Discovery',
+        path: "discovery",
+        component: () => import("@/views/discovery"),
       },
     ],
   },
